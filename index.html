@@ -1,9 +1,220 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>Test</title>
+	<title>Window system</title>
+	<meta charset="utf-8">
+	<link rel="stylesheet" type="text/css" href="./css/default.css">
+	<link rel="stylesheet" type="text/css" href="./css/windows_98.css">
+
+</head>
 </head>
 <body>
-<h1>Test</h1>
+
+<div type="text/template" id="default-window-template" style="display: none;">
+	<div class="window">
+		<div class="window-head">
+			<div class="window-head--title">Window title</div>
+			<div class="window-head--actions">
+				<button class="turn">_</button>
+				<button class="fullscreen">□</button>
+				<button class="close">x</button>
+			</div>
+		</div>
+		<div class="window-body">
+			Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod
+			tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,
+			quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo
+			consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse
+			cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non
+			proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		</div>
+		<div class="window-footer">
+			footer info
+		</div>
+	</div>
+</div>
+
+<div class="workspace"></div>
+
+<script type="text/javascript">
+function NewWindow(title){
+	this.title = title;
+
+	var isFullScreen = false;
+
+	this.isFullScreen = function(){
+		return isFullScreen;
+	}
+	this.setFullScreen = function(flag){
+		isFullScreen = flag;
+	}
+	this.createWindow().alignCenter();
+}
+
+NewWindow.prototype.createWindow = function(){
+	var tmpDiv = document.createElement('div');
+		tmpDiv.innerHTML = document.querySelector('#default-window-template').innerHTML;
+
+	this.window = tmpDiv.firstElementChild;
+	this.window.querySelector('.window-head--title').innerText = this.title;
+	document.querySelector('.workspace').appendChild(this.window);
+
+	return this;
+}
+
+NewWindow.prototype.alignCenter = function(){
+	let wsH = document.querySelector('.workspace').offsetHeight;
+	let wsW = document.querySelector('.workspace').offsetWidth;
+
+	this.position(wsW/2-this.window.offsetWidth/2, wsH/2-this.window.offsetHeight/2);
+
+	return this;
+}
+
+NewWindow.prototype.position = function(x, y){
+	this.window.style.top = y+"px";
+	this.window.style.left = x+"px";
+	return this;
+}
+
+NewWindow.prototype.getPosition = function(){
+	return [parseInt(this.window.style.left), parseInt(this.window.style.top)];
+}
+
+NewWindow.prototype.fullscreen = function(flag){
+	flag = new Boolean(flag);
+
+	if( this.isFullScreen() == flag.valueOf() ){
+		return this;
+	}
+	
+	this.setFullScreen(flag.valueOf());
+	if( flag.valueOf() ){
+		[this.prevPosX, this.prevPosY] = this.getPosition();
+		this.window.classList.add('animation');
+		setTimeout(function(){this.window.classList.add('fullscreen');this.position(0, 0);}.bind(this), 5);
+	} else {
+		this.window.classList.remove('fullscreen');
+		this.position(this.prevPosX, this.prevPosY);
+		setTimeout(function(){this.window.classList.remove('animation');}.bind(this), 1500);
+	}
+	
+
+	return this;
+}
+
+NewWindow.prototype.toogleFullscreen = function(){
+	this.fullscreen(!this.isFullScreen());
+}
+
+NewWindow.prototype.setActive = function(flag){
+	if( new Boolean(flag).valueOf() ){
+		this.window.classList.add('active');
+	} else {
+		this.window.classList.remove('active');
+	}
+}
+
+
+function WindowManager(){
+	this.windowStack = [];
+	this.currentActiveIdx = 0;
+	this.lastIdx = 0;
+}
+
+WindowManager.prototype.push = function(newWindow){
+	if( Number.MAX_SAFE_INTEGER == this.lastIdx ){
+		this.lastIdx = 0;
+	}
+
+	newWindow.window.dataset.idx = ++this.lastIdx;
+	this.windowStack.push(newWindow);
+	if( this.windowStack.length > 1 ){
+		var [x, y] = this.windowStack[this.currentActiveIdx].getPosition(0);
+		x += 50;
+		y += 50;
+		newWindow.position(x, y);
+	}
+	this.setActive(this.lastIdx);
+	this.initActions(newWindow);
+}
+
+WindowManager.prototype.setActive = function(windowDataIdx){
+	if( this.currentActiveIdx == this.getWindowIdxInStackByDataIdx(windowDataIdx) ){
+		return;
+	}
+
+	var self = this;
+	var prevActive = self.currentActiveIdx;
+	this.removeActive();
+
+	this.currentActiveIdx = this.getWindowIdxInStackByDataIdx(windowDataIdx);
+	this.windowStack[this.currentActiveIdx].setActive(true);
+
+	if( this.windowStack[prevActive] ){
+		var referenceNode = this.windowStack[prevActive].window;
+		var currentNode = this.windowStack[this.currentActiveIdx].window;
+		referenceNode.parentNode.insertBefore(currentNode, referenceNode.nextSibling);
+	}
+}
+
+WindowManager.prototype.getWindowByDataIdx = function(dataIdx){
+	return this.windowStack[this.getWindowIdxInStackByDataIdx(dataIdx)];
+}
+WindowManager.prototype.getWindowIdxInStackByDataIdx = function(dataIdx){
+	return this.windowStack.findIndex(function(w, i) {
+	    return w.window.dataset.idx == dataIdx;
+	});
+}
+
+WindowManager.prototype.removeActive = function(){
+	if( this.windowStack[this.currentActiveIdx] ){
+		this.windowStack[this.currentActiveIdx].setActive(false);
+	}
+}
+
+WindowManager.prototype.initActions = function(w){
+	w.window.addEventListener('click', this.eventHandlers.setActive.bind(this));
+
+	w.window.querySelector('.window-head--actions .fullscreen').addEventListener('click', this.eventHandlers.fullscreen.bind(this));
+	w.window.querySelector('.window-head--actions .close').addEventListener('click', this.eventHandlers.close.bind(this));
+}
+WindowManager.prototype.clearActions = function(w){
+	w.window.removeEventListener('click', this.eventHandlers.setActive);
+}
+
+WindowManager.prototype.eventHandlers = {
+	setActive: function(e){
+		if( e.target.classList.contains('close') ){
+			return;
+		}
+		if( !e.target.classList.contains('window') ){
+			this.setActive(e.target.closest('.window').dataset.idx);
+		} else {
+			this.setActive(e.target.dataset.idx);
+		}
+	},
+	fullscreen: function(e){
+		this.getWindowByDataIdx(e.target.closest('.window').dataset.idx).toogleFullscreen();
+	},
+	close: function(e){
+		let w = e.target.closest('.window');
+		this.windowStack.splice(this.getWindowIdxInStackByDataIdx(w.dataset.idx), 1);
+		w.remove();
+
+		if( this.windowStack.length > 0 ){
+			this.setActive(this.windowStack[this.windowStack.length-1].window.dataset.idx); 
+		} else {
+			this.currentActiveIdx = -1;
+		}
+	}
+}
+
+var wm = new WindowManager;
+wm.push(new NewWindow('Title 1'));
+wm.push(new NewWindow('Title 2'));
+wm.push(new NewWindow('Title 3'));
+
+</script>
 </body>
 </html>

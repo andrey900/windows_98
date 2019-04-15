@@ -2,7 +2,7 @@
 	border: 2px solid #BFBFBF;
 }
 .window.animation{
-	transition: all 0.25s ease-in;
+	transition: all 0.15s ease-in;
 }
 .window.fullscreen{
 	width: 100%;
@@ -40,8 +40,6 @@
 	border-right: 2px solid #eee;
 	border-bottom: 2px solid #eee;
 	margin-bottom: 26px;
-
-    min-height: 180px;
 }
 .window > .window-footer{
 	position: absolute;
